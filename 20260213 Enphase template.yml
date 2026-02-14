@@ -1,0 +1,183 @@
+zabbix_export:
+  version: '7.4'
+  template_groups:
+    - uuid: 7df96b18c230490a9a0a9e2307226338
+      name: Templates
+    - uuid: 3dcd5bbe90534f9e8eb5c2d53756af63
+      name: Templates/Power
+  templates:
+    - uuid: 95f88c06f68a4ab68f6d11937b6efc73
+      template: 'Enphase solar system'
+      name: 'Enphase solar system'
+      groups:
+        - name: Templates
+        - name: Templates/Power
+      items:
+        - uuid: 4565095e98114bc9b4318341718280cc
+          name: 'Enphase > Consumption > cumulative > currW'
+          type: DEPENDENT
+          key: enphase.cumulative_currw
+          value_type: FLOAT
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.cumulative.currW
+          master_item:
+            key: 'enphase.totalConsumption[{$ENPHASE_HOST},{$ENPHASE_TOKEN}]'
+        - uuid: 10056a103454450a9299ffa7e11a48ee
+          name: 'Enphase > Consumption > cumulative > currW - rate'
+          type: DEPENDENT
+          key: enphase.cumulative_currwRate
+          value_type: FLOAT
+          preprocessing:
+            - type: SIMPLE_CHANGE
+          master_item:
+            key: enphase.cumulative_currw
+        - uuid: 5843e66f681546d0b9471961b241e98a
+          name: 'Enphase > Consumption > cumulative > delivered watt hours'
+          type: DEPENDENT
+          key: enphase.cumulative_whDlvd
+          value_type: FLOAT
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.cumulative.whDlvdCum
+          master_item:
+            key: 'enphase.totalConsumption[{$ENPHASE_HOST},{$ENPHASE_TOKEN}]'
+        - uuid: 24dc482a59f74faf94da58e3b10efed3
+          name: 'Enphase > Consumption > cumulative > delivered watt hours - rate'
+          type: DEPENDENT
+          key: enphase.cumulative_whDlvdRate
+          value_type: FLOAT
+          preprocessing:
+            - type: SIMPLE_CHANGE
+          master_item:
+            key: enphase.cumulative_whDlvd
+        - uuid: 0592b53651574496aaebc9fb2a49f990
+          name: 'Enphase > total consumption'
+          key: 'enphase.totalConsumption[{$ENPHASE_HOST},{$ENPHASE_TOKEN}]'
+          delay: '30m;5m/1-7,08:00-16:00;45m/1-7,07:59-16:01'
+          value_type: TEXT
+      discovery_rules:
+        - uuid: 1fceaddb35e443048a472e167faf4ae8
+          name: 'Enphase > Discovery > Inverters'
+          type: SCRIPT
+          key: 'enphase.discovery.inverters[{$ENPHASE_HOST},{$ENPHASE_TOKEN}]'
+          delay: 1d
+          status: DISABLED
+          params: |
+            try {
+                var params = JSON.parse(value);
+            	Zabbix.log(2, '[ Enphase ] Inverter discovery parameters ' + params);
+            
+                var req = new HttpRequest(),
+                    result = {tags: {}};
+            
+                if (typeof params.HTTPProxy === 'string' && params.HTTPProxy.trim() !== '') {
+                    req.setProxy(params.HTTPProxy);
+                }
+            
+                req.addHeader('Content-Type: application/json; charset=utf-8');
+                req.addHeader('Authorization: Bearer ' + params.ENPHASE.TOKEN);
+            
+                var enphase_endpoint = 'https://'+params.ENPHASE.HOST +'/';
+            
+            	response = req.get(enphase_endpoint, data);
+            	Zabbix.log(4, '[ Enphase ] Inverter discovery Received response with status code ' + request.getStatus() + '\n' + response);
+            
+            	if (response !== null) {
+            		try {
+            			response = JSON.parse(response);
+            		}
+            		catch (error) {
+            			Zabbix.log(4, '[ Enphase ] Failed to parse response received from IQ host');
+            			response = null;
+            		} // catch
+            	} // if: got response?
+            
+            
+            	if (request.getStatus() < 200 || request.getStatus() >= 300) {
+            		var message = 'Request failed with status code ' + request.getStatus();
+            
+            		if (response !== null && typeof response.error.message !== 'undefined'
+            			&& Object.keys(response.error).length > 0) {
+            			message += ': ' + JSON.stringify(response.error.message);
+            		}
+            
+            		throw message + ' Check debug log for more information.';
+            	} // if
+            	else if (typeof response.result !== 'object' || typeof response.result.sys_id === 'undefined') {
+            		throw 'Issue running Enphase inverter discovery. Check debug log for more information.';
+            	} // else
+            
+            	return response.result;
+            } // try
+            catch (error) {
+                Zabbix.log(4, '[ Enphase ] Inverter discovery failed : ' + error);
+                throw 'Enphase Inverter discovery failed : ' + error;
+            } // catch
+        - uuid: 28b2e2fa7c114abca44411cbc1fa5025
+          name: 'Enphase > Discovery > Meters'
+          key: 'enphase.discovery.meters[{$ENPHASE_HOST},{$ENPHASE_TOKEN}]'
+          delay: 1d
+          item_prototypes:
+            - uuid: 95e440d647084c02b631354c5497a94a
+              name: 'Enphase > Meters > {#EID} > Current'
+              type: DEPENDENT
+              key: 'enphase.meter.current[{$ENPHASE_HOST},{$ENPHASE_TOKEN},{#EID}]'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - $.current
+              master_item:
+                key: 'enphase.meter.reading[{$ENPHASE_HOST},{$ENPHASE_TOKEN},{#EID}]'
+            - uuid: a5d883a7f74b4150805d6f2c071d6073
+              name: 'Enphase > Meters > {#EID} > Power factor'
+              type: DEPENDENT
+              key: 'enphase.meter.pwrFactor[{$ENPHASE_HOST},{$ENPHASE_TOKEN},{#EID}]'
+              value_type: FLOAT
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - $.pwrFactor
+              master_item:
+                key: 'enphase.meter.reading[{$ENPHASE_HOST},{$ENPHASE_TOKEN},{#EID}]'
+            - uuid: fd40ee2505a7450e9239d1a525ca0fa9
+              name: 'Enphase > Meters > {#EID} > Reading'
+              key: 'enphase.meter.reading[{$ENPHASE_HOST},{$ENPHASE_TOKEN},{#EID}]'
+              delay: '1h;5m/1-7,08:00-16:00;45m/1-7,07:59-16:01'
+              value_type: TEXT
+            - uuid: f1eb1a547f44429da8d1a38724d708ee
+              name: 'Enphase > Meters > {#EID} > Status'
+              key: 'enphase.meter.status[{$ENPHASE_HOST},{$ENPHASE_TOKEN},{#EID}]'
+              delay: 1h
+              value_type: CHAR
+            - uuid: 9a8b9e6fa4db459ba932ae9edf2d3c52
+              name: 'Enphase > Meters > {#EID} > Voltage'
+              type: DEPENDENT
+              key: 'enphase.meter.voltage[{$ENPHASE_HOST},{$ENPHASE_TOKEN},{#EID}]'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - $.voltage
+              master_item:
+                key: 'enphase.meter.reading[{$ENPHASE_HOST},{$ENPHASE_TOKEN},{#EID}]'
+            - uuid: a875fa7e79574765b3f9bfa921f170e1
+              name: 'Enphase > Meters > {#EID} > Watts'
+              type: CALCULATED
+              key: 'enphase.meter.watts[{$ENPHASE_HOST},{$ENPHASE_TOKEN},{#EID}]'
+              delay: 1h
+              value_type: FLOAT
+              params: |
+                last(//enphase.meter.voltage[{$ENPHASE_HOST},{$ENPHASE_TOKEN},{#EID}])*
+                last(//enphase.meter.current[{$ENPHASE_HOST},{$ENPHASE_TOKEN},{#EID}])*
+                last(//enphase.meter.pwrFactor[{$ENPHASE_HOST},{$ENPHASE_TOKEN},{#EID}])
+              description: 'Based on discussion at https://support.enphase.com/s/question/0D53m00006qTFdpCAG/do-these-figures-reported-from-the-envoy-make-sense'
+          lld_macro_paths:
+            - lld_macro: '{#EID}'
+              path: $.eid
+      macros:
+        - macro: '{$ENPHASE_HOST}'
+          value: hostname-or-IP-of-Enphase-gateway-goes-here
+        - macro: '{$ENPHASE_TOKEN}'
+          value: API.token.goes.here
