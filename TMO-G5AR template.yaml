@@ -1,0 +1,87 @@
+zabbix_export:
+  version: '7.4'
+  template_groups:
+    - uuid: 36bff6c29af64692839d077febfc7079
+      name: 'Templates/Network devices'
+  templates:
+    - uuid: fde6e36e0d8a41a795124b414be08e51
+      template: TMO-G5AR
+      name: TMO-G5AR
+      groups:
+        - name: 'Templates/Network devices'
+      items:
+        - uuid: 9685b9e4e3db4cbcb06ac8451cd32a01
+          name: 'Get gateways data'
+          type: HTTP_AGENT
+          key: g5ar.getdata
+          value_type: TEXT
+          url: 'http://{$G5AR_ADDRESS}/TMI/v1/gateway'
+          query_fields:
+            - name: get
+              value: all
+          output_format: JSON
+        - uuid: 39cbe10445f7419da06b138fae1f546c
+          name: 'G5AR > 5G Bars'
+          type: DEPENDENT
+          key: g5ar.signal.bars
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.body.signal.5g.bars
+          master_item:
+            key: g5ar.getdata
+        - uuid: bdf07531053142dbbb5407c695c7331e
+          name: 'G5AR > 5G RSRP'
+          type: DEPENDENT
+          key: g5ar.signal.rsrp
+          value_type: FLOAT
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.body.signal.5g.rsrp
+          master_item:
+            key: g5ar.getdata
+        - uuid: e2760e5cdf29436f934c12c7a0c7fc00
+          name: 'G5AR > 5G RSRQ'
+          type: DEPENDENT
+          key: g5ar.signal.rsrq
+          value_type: FLOAT
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.body.signal.5g.rsrq
+          master_item:
+            key: g5ar.getdata
+        - uuid: 8410c1a340de4c179731387d5a020e82
+          name: 'G5AR > 5G RSSI'
+          type: DEPENDENT
+          key: g5ar.signal.rssi
+          value_type: FLOAT
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.body.signal.5g.rssi
+          master_item:
+            key: g5ar.getdata
+        - uuid: b11d6f00dedc489da68077d963bca291
+          name: 'G5AR > 5G SINR'
+          type: DEPENDENT
+          key: g5ar.signal.sinr
+          value_type: FLOAT
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.body.signal.5g.sinr
+          master_item:
+            key: g5ar.getdata
+        - uuid: c1c261293e7a460088cd9a53e111051b
+          name: 'G5AR > Uptime'
+          type: DEPENDENT
+          key: g5ar.time.upTime
+          units: s
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.body.time.upTime
+          master_item:
+            key: g5ar.getdata
